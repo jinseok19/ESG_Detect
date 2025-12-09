@@ -97,6 +97,7 @@ class ESG_RAG:
         answer = result['result']
         # 페이지 메타데이터에서 여러 키 시도
         sources = []
+        source_pages = []  # 숫자 페이지 번호 리스트
         for doc in result['source_documents']:
             page_num = None
             # page_label 우선 확인
@@ -109,9 +110,12 @@ class ESG_RAG:
             elif 'page_number' in doc.metadata:
                 page_num = doc.metadata['page_number']
             
-            if page_num:
+            if page_num and isinstance(page_num, (int, float)):
+                page_num = int(page_num)
                 sources.append(f"{page_num}페이지")
+                source_pages.append(page_num)
             else:
                 sources.append("Unknown페이지")
         unique_sources = list(set(sources))
-        return answer, unique_sources
+        unique_pages = sorted(list(set(source_pages)))  # 숫자 페이지 번호 리스트 (중복 제거, 정렬)
+        return answer, unique_sources, unique_pages

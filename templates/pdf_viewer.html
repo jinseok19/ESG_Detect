@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF 뷰어 - {{ filename }}</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+        iframe {
+            width: 100vw;
+            height: 100vh;
+            border: none;
+        }
+    </style>
+</head>
+<body>
+    <iframe src="/pdf/{{ filename }}#page={{ page }}" type="application/pdf"></iframe>
+    <script>
+        // 페이지 로드 후 특정 페이지로 이동 시도
+        window.onload = function() {
+            const iframe = document.querySelector('iframe');
+            const pageNum = {{ page }};
+            
+            // iframe 로드 후 페이지 이동
+            iframe.onload = function() {
+                try {
+                    // Chrome PDF 뷰어
+                    if (iframe.contentWindow && iframe.contentWindow.PDFViewerApplication) {
+                        iframe.contentWindow.PDFViewerApplication.page = pageNum;
+                    }
+                    // Firefox PDF.js
+                    else if (iframe.contentWindow && iframe.contentWindow.PDFViewer) {
+                        iframe.contentWindow.PDFViewer.page = pageNum;
+                    }
+                } catch (e) {
+                    console.log('PDF 뷰어 접근 제한:', e);
+                }
+            };
+        };
+    </script>
+</body>
+</html>

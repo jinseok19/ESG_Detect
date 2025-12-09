@@ -36,6 +36,14 @@
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
         }
+        .badge.bg-primary {
+            cursor: pointer;
+            transition: transform 0.2s, opacity 0.2s;
+        }
+        .badge.bg-primary:hover {
+            opacity: 0.9;
+            transform: scale(1.05);
+        }
     </style>
 </head>
 <body class="bg-light">
@@ -99,6 +107,32 @@
         <div class="alert alert-info mb-4">
             <i class="bi bi-info-circle"></i>
             <strong>RAG 기술 적용:</strong> AI는 보고서 본문을 직접 검색하여 답변하며, 근거가 된 페이지를 표시합니다.
+            <strong class="ms-2">💡 팁:</strong> 출처 페이지 번호를 클릭하면 PDF에서 해당 페이지로 이동합니다! 
+            <small>(일부 브라우저에서는 새 창이 열릴 수 있습니다)</small>
+        </div>
+
+        <!-- PDF 뷰어 섹션 -->
+        <div class="card mb-4 shadow">
+            <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-file-earmark-pdf"></i> PDF 뷰어</h5>
+                <div>
+                    <button type="button" class="btn btn-sm btn-outline-light me-2" onclick="downloadPdf()">
+                        <i class="bi bi-download"></i> 다운로드
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-light" onclick="togglePdfViewer()">
+                        <i class="bi bi-arrows-expand" id="toggleIcon"></i> <span id="toggleText">접기</span>
+                    </button>
+                </div>
+            </div>
+            <div class="card-body p-0" id="pdfViewerContainer" style="height: 800px;">
+                <iframe id="pdfViewer" 
+                        src="/pdf/{{ pdf_filename }}" 
+                        style="width: 100%; height: 100%; border: none;"
+                        type="application/pdf">
+                    브라우저가 PDF를 지원하지 않습니다. 
+                    <a href="/pdf/{{ pdf_filename }}" target="_blank">여기를 클릭하여 다운로드하세요.</a>
+                </iframe>
+            </div>
         </div>
 
         <!-- 카테고리별 결과 -->
@@ -140,7 +174,31 @@
                                         <i class="bi bi-file-text"></i> 
                                         <strong>출처:</strong> 
                                         {% for source in result.sources %}
-                                            <span class="badge bg-secondary category-badge">{{ source }}</span>
+                                            {% set page_str = source.replace('페이지', '').strip() %}
+                                            {% set page_num = None %}
+                                            {% if page_str and page_str != 'Unknown' %}
+                                                {% if page_str.isdigit() %}
+                                                    {% set page_num = page_str %}
+                                                {% else %}
+                                                    {% for pn in result.page_numbers %}
+                                                        {% if page_str|string == pn|string %}
+                                                            {% set page_num = pn %}
+                                                        {% endif %}
+                                                    {% endfor %}
+                                                {% endif %}
+                                            {% endif %}
+                                            
+                                            {% if page_num %}
+                                                <a href="/pdf/{{ pdf_filename }}#page={{ page_num }}" 
+                                                   class="badge bg-primary category-badge text-decoration-none me-1" 
+                                                   onclick="gotoPage({{ page_num }}, event); return false;"
+                                                   title="클릭하여 PDF {{ page_num }}페이지로 이동 (우클릭: 새 창에서 열기)"
+                                                   target="_blank">
+                                                    <i class="bi bi-arrow-right-circle"></i> {{ source }}
+                                                </a>
+                                            {% else %}
+                                                <span class="badge bg-secondary category-badge">{{ source }}</span>
+                                            {% endif %}
                                         {% endfor %}
                                     </small>
                                 </div>
@@ -168,5 +226,98 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // PDF 특정 페이지로 이동하는 함수
+        function gotoPage(pageNum, evt) {
+            if (!evt) evt = window.event;
+            
+            const pdfViewer = document.getElementById('pdfViewer');
+            const container = document.getElementById('pdfViewerContainer');
+            
+            // PDF 뷰어가 숨겨져 있으면 표시
+            if (container.style.display === 'none') {
+                container.style.display = 'block';
+                document.getElementById('toggleText').textContent = '접기';
+                document.getElementById('toggleIcon').className = 'bi bi-arrows-collapse';
+            }
+            
+            // 페이지 이동 - iframe src 변경
+            const baseUrl = '/pdf/{{ pdf_filename }}';
+            const pdfUrl = baseUrl + '#page=' + pageNum;
+            
+            // iframe을 완전히 재로드 (캐시 방지를 위해 타임스탬프 추가)
+            const currentSrc = pdfViewer.src.split('#')[0];
+            pdfViewer.src = '';
+            
+            setTimeout(() => {
+                pdfViewer.src = pdfUrl;
+                
+                // 추가 시도: iframe 로드 후 내부 접근
+                const checkPage = setInterval(() => {
+                    try {
+                        if (pdfViewer.contentWindow && pdfViewer.contentWindow.PDFViewerApplication) {
+                            pdfViewer.contentWindow.PDFViewerApplication.page = pageNum;
+                            clearInterval(checkPage);
+                        }
+                    } catch (e) {
+                        // Cross-origin 제한 - 정상, 계속 시도
+                    }
+                }, 200);
+                
+                // 3초 후 타임아웃
+                setTimeout(() => clearInterval(checkPage), 3000);
+            }, 100);
+            
+            // PDF 뷰어 섹션으로 스크롤
+            setTimeout(() => {
+                container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }, 300);
+            
+            // 뱃지 하이라이트 효과
+            if (evt && evt.target) {
+                const badge = evt.target.closest('.badge');
+                if (badge) {
+                    badge.style.transform = 'scale(1.1)';
+                    badge.style.transition = 'transform 0.2s';
+                    setTimeout(() => {
+                        badge.style.transform = 'scale(1)';
+                    }, 300);
+                }
+            }
+            
+            return false;
+        }
+
+        // PDF 다운로드 함수
+        function downloadPdf() {
+            window.open('/pdf/{{ pdf_filename }}', '_blank');
+        }
+
+        // PDF 뷰어 토글 함수
+        function togglePdfViewer() {
+            const container = document.getElementById('pdfViewerContainer');
+            const toggleText = document.getElementById('toggleText');
+            const toggleIcon = document.getElementById('toggleIcon');
+            
+            if (container.style.display === 'none') {
+                container.style.display = 'block';
+                container.style.height = '800px';
+                toggleText.textContent = '접기';
+                toggleIcon.className = 'bi bi-arrows-collapse';
+            } else {
+                container.style.display = 'none';
+                toggleText.textContent = '펼치기';
+                toggleIcon.className = 'bi bi-arrows-expand';
+            }
+        }
+
+        // 페이지 로드 시 PDF 뷰어가 로드되었는지 확인
+        document.addEventListener('DOMContentLoaded', function() {
+            const pdfViewer = document.getElementById('pdfViewer');
+            pdfViewer.addEventListener('load', function() {
+                console.log('PDF 뷰어가 로드되었습니다.');
+            });
+        });
+    </script>
 </body>
 </html>

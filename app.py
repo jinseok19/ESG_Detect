@@ -1,7 +1,7 @@
 import os
 import traceback
 
-from flask import Flask, render_template, request, redirect, flash
+from flask import Flask, render_template, request, redirect, flash, send_from_directory
 from dotenv import load_dotenv
 from rag_engine import ESG_RAG
 
@@ -108,7 +108,7 @@ def index():
             
             for key, item in questions.items():
                 try:
-                    answer, sources = rag.ask(item["question"])
+                    answer, sources, page_numbers = rag.ask(item["question"])
                     # 답변에서 "찾을 수 없습니다"가 포함되어 있으면 없음으로 판단
                     is_found = "찾을 수 없습니다" not in answer and "없습니다" not in answer[:50]
                     if is_found:
@@ -119,6 +119,7 @@ def index():
                         "category": item["category"],
                         "answer": answer,
                         "sources": sources if sources else [],
+                        "page_numbers": page_numbers if page_numbers else [],  # 숫자 페이지 번호 리스트
                         "found": is_found
                     }
                 except Exception as e:
@@ -127,6 +128,7 @@ def index():
                         "category": item["category"],
                         "answer": f"질문 처리 중 오류 발생: {str(e)}",
                         "sources": [],
+                        "page_numbers": [],
                         "found": False
                     }
             
@@ -141,7 +143,8 @@ def index():
             return render_template('result.html', 
                                  results=results, 
                                  filename=file.filename,
-                                 summary=summary)
+                                 summary=summary,
+                                 pdf_filename=file.filename)
             
         except Exception as e:
             error_msg = f'처리 중 오류가 발생했습니다: {str(e)}\n{traceback.format_exc()}'
@@ -150,6 +153,26 @@ def index():
             return redirect(request.url)
             
     return render_template('index.html')
+
+@app.route('/pdf/<filename>')
+def serve_pdf(filename):
+    """PDF 파일을 제공하는 엔드포인트"""
+    try:
+        return send_from_directory(
+            app.config['UPLOAD_FOLDER'],
+            filename,
+            mimetype='application/pdf',
+            as_attachment=False  # 브라우저에서 바로 열 수 있도록
+        )
+    except FileNotFoundError:
+        flash('PDF 파일을 찾을 수 없습니다.', 'error')
+        return redirect('/')
+
+@app.route('/viewer/<filename>')
+def pdf_viewer(filename):
+    """PDF 뷰어 페이지 (페이지 번호 파라미터 지원)"""
+    page = request.args.get('page', '1')
+    return render_template('pdf_viewer.html', filename=filename, page=page)
 
 if __name__ == '__main__':
     app.run(debug=True)
