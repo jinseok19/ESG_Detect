@@ -39,9 +39,22 @@ def index():
             filepath = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
             file.save(filepath)
             
+            # 파일 크기 체크 (100MB 제한)
+            file_size = os.path.getsize(filepath) / (1024 * 1024)  # MB
+            if file_size > 100:
+                flash(f'PDF 파일이 너무 큽니다 ({file_size:.1f}MB). 100MB 이하의 파일만 처리 가능합니다.', 'error')
+                if os.path.exists(filepath):
+                    os.remove(filepath)
+                return redirect(request.url)
+            
             # RAG 엔진 초기화 (시간이 조금 걸릴 수 있음)
             try:
                 rag = ESG_RAG(filepath, api_key)
+            except MemoryError as e:
+                flash(f'PDF 파일이 너무 크거나 복잡하여 메모리 부족이 발생했습니다. 더 작은 파일로 시도해주세요. ({str(e)})', 'error')
+                if os.path.exists(filepath):
+                    os.remove(filepath)
+                return redirect(request.url)
             except Exception as e:
                 flash(f'PDF 파일 처리 중 오류가 발생했습니다: {str(e)}', 'error')
                 if os.path.exists(filepath):

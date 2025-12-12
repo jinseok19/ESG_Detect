@@ -1,4 +1,6 @@
 import os
+import gc
+import logging
 
 from langchain_community.document_loaders import PDFPlumberLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
@@ -16,9 +18,42 @@ class ESG_RAG:
 
     def _initialize_vector_db(self):
         """PDF를 로드하고 청크로 나누어 벡터 DB(FAISS)에 저장"""
-        # 1. PDF 로드 (PDFPlumber 사용)
-        loader = PDFPlumberLoader(self.pdf_path)
-        documents = loader.load()
+        # 1. PDF 로드 (PDFPlumber 사용, 메모리 최적화)
+        try:
+            import pdfplumber
+            from langchain_core.documents import Document
+            
+            # pdfplumber를 직접 사용하여 페이지 단위로 처리 (메모리 효율적)
+            documents = []
+            with pdfplumber.open(self.pdf_path) as pdf:
+                for page_num, page in enumerate(pdf.pages):
+                    try:
+                        # 텍스트만 추출 (이미지/그래픽 제외)
+                        text = page.extract_text()
+                        if text and len(text.strip()) >= 50:  # 최소 길이 체크
+                            documents.append(Document(
+                                page_content=text,
+                                metadata={'page': page_num, 'page_label': page_num + 1}
+                            ))
+                        # 페이지 처리 후 즉시 메모리 해제
+                        del text
+                    except Exception as page_error:
+                        # 개별 페이지 오류는 스킵하고 계속 진행
+                        logging.warning(f"페이지 {page_num + 1} 처리 중 오류: {str(page_error)}")
+                        continue
+                    finally:
+                        # 명시적 메모리 해제
+                        gc.collect()
+                        
+        except MemoryError:
+            raise MemoryError("PDF 로드 중 메모리 부족. 파일이 너무 크거나 복잡할 수 있습니다.")
+        except Exception as e:
+            # PDFPlumberLoader로 폴백 시도
+            try:
+                loader = PDFPlumberLoader(self.pdf_path)
+                documents = loader.load()
+            except Exception as fallback_error:
+                raise MemoryError(f"PDF 로드 실패: {str(e)}. 폴백 시도도 실패: {str(fallback_error)}")
         
         if not documents:
             raise ValueError(f"PDF 파일에서 텍스트를 추출할 수 없습니다: {self.pdf_path}")
@@ -40,6 +75,10 @@ class ESG_RAG:
         )
         texts = text_splitter.split_documents(documents)
         
+        # 원본 documents 메모리 해제
+        del documents
+        gc.collect()
+        
         # 청크에도 페이지 메타데이터 유지
         for text in texts:
             if 'page' in text.metadata and 'page_label' not in text.metadata:
@@ -51,6 +90,10 @@ class ESG_RAG:
             openai_api_key=self.api_key
         )
         self.vector_store = FAISS.from_documents(texts, embeddings)
+        
+        # texts 메모리 해제
+        del texts
+        gc.collect()
 
     def ask(self, question):
         """질문에 대해 근거를 찾아 답변"""
