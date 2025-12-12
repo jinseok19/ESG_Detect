@@ -131,7 +131,12 @@ class ESG_RAG:
         )
         # RAG 체인 생성
         qa_chain = RetrievalQA.from_chain_type(
-            llm=ChatOpenAI(model="gpt-4o", temperature=0, openai_api_key=self.api_key),
+            llm=ChatOpenAI(
+                model="gpt-4o", 
+                temperature=0, 
+                openai_api_key=self.api_key,
+                request_timeout=60  # OpenAI API 타임아웃 설정 (60초)
+            ),
             chain_type="stuff",
             retriever=self.vector_store.as_retriever(
                 search_kwargs={"k": 8}  # 원래대로 복원 (더 포괄적 검색)

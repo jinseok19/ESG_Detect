@@ -63,7 +63,7 @@ def index():
                     os.remove(filepath)
                 return redirect(request.url)
             
-            # 검토할 ESG 항목 리스트 (확장)
+            # 검토할 ESG 항목 리스트 (핵심 항목만 - 처리 시간 단축)
             questions = {
                 "scope1": {
                     "title": "Scope 1 배출량",
@@ -80,35 +80,10 @@ def index():
                     "question": "Scope 3 기타 간접 배출량 데이터가 포함되어 있습니까? 있다면 구체적인 수치(단위 포함), 범주, 연도를 알려주세요.",
                     "category": "환경"
                 },
-                "methodology": {
-                    "title": "측정 방법론",
-                    "question": "온실가스 배출량 측정 방법론(GHG Protocol, ISO 14064 등)이 명시되어 있습니까? 어떤 방법론을 사용했는지 구체적으로 설명해주세요.",
-                    "category": "환경"
-                },
-                "materiality": {
-                    "title": "이중 중대성 평가",
-                    "question": "이중 중대성(Double Materiality) 평가를 수행했다는 내용이 있습니까? 재무적 중대성과 영향 중대성을 모두 평가했는지 설명해주세요.",
-                    "category": "거버넌스"
-                },
                 "target": {
                     "title": "탄소 중립 목표",
                     "question": "탄소 중립(Carbon Neutral) 또는 넷제로(Net Zero) 목표가 설정되어 있습니까? 목표 연도와 구체적인 계획을 알려주세요.",
                     "category": "환경"
-                },
-                "renewable": {
-                    "title": "재생 에너지",
-                    "question": "재생 에너지 사용 현황이나 목표가 포함되어 있습니까? 있다면 비율이나 용량을 알려주세요.",
-                    "category": "환경"
-                },
-                "diversity": {
-                    "title": "다양성 및 포용성",
-                    "question": "성별 다양성, 이사회 다양성 등 ESG의 Social 측면에서 다양성 및 포용성(D&I) 관련 내용이 있습니까? 구체적인 수치가 있다면 포함해주세요.",
-                    "category": "사회"
-                },
-                "supply_chain": {
-                    "title": "공급망 관리",
-                    "question": "공급망(Supply Chain) ESG 관리 정책이나 프로그램이 설명되어 있습니까? 구체적인 내용을 알려주세요.",
-                    "category": "사회"
                 },
                 "governance": {
                     "title": "거버넌스 구조",
