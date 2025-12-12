@@ -2,12 +2,13 @@ import os
 import gc
 import logging
 
-from langchain_community.document_loaders import PDFPlumberLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain_community.vectorstores import FAISS
 from langchain.chains import RetrievalQA
 from langchain.prompts import PromptTemplate
+from langchain_core.documents import Document
+import PyPDF2
 
 class ESG_RAG:
     def __init__(self, pdf_path, api_key):
@@ -18,61 +19,62 @@ class ESG_RAG:
 
     def _initialize_vector_db(self):
         """PDF를 로드하고 청크로 나누어 벡터 DB(FAISS)에 저장"""
-        # 1. PDF 로드 (PDFPlumber 사용, 메모리 최적화)
+        # 1. PDF 로드 (PyPDF2 사용 - 빠르고 메모리 효율적)
+        documents = []
+        
+        # 최대 페이지 수 제한 (메모리/시간 절약)
+        MAX_PAGES = 300  # 2GB 인스턴스에서 충분히 처리 가능
+        
         try:
-            import pdfplumber
-            from langchain_core.documents import Document
-            
-            # pdfplumber를 직접 사용하여 페이지 단위로 처리 (메모리 효율적)
-            documents = []
-            with pdfplumber.open(self.pdf_path) as pdf:
-                for page_num, page in enumerate(pdf.pages):
+            with open(self.pdf_path, 'rb') as file:
+                pdf_reader = PyPDF2.PdfReader(file)
+                total_pages = len(pdf_reader.pages)
+                pages_to_process = min(total_pages, MAX_PAGES)
+                
+                if total_pages > MAX_PAGES:
+                    logging.warning(f"PDF가 너무 큽니다 ({total_pages}페이지). 처음 {MAX_PAGES}페이지만 처리합니다.")
+                else:
+                    logging.info(f"PDF 총 {total_pages}페이지 처리 시작")
+                
+                for page_num in range(pages_to_process):
                     try:
-                        # 텍스트만 추출 (이미지/그래픽 제외)
+                        page = pdf_reader.pages[page_num]
                         text = page.extract_text()
-                        if text and len(text.strip()) >= 50:  # 최소 길이 체크
+                        
+                        if text and len(text.strip()) >= 50:
                             documents.append(Document(
                                 page_content=text,
                                 metadata={'page': page_num, 'page_label': page_num + 1}
                             ))
-                        # 페이지 처리 후 즉시 메모리 해제
-                        del text
+                        
+                        # 20페이지마다 로깅 (2GB면 덜 자주 gc 필요)
+                        if (page_num + 1) % 20 == 0:
+                            gc.collect()
+                            logging.info(f"{page_num + 1}/{pages_to_process} 페이지 처리 완료")
+                            
                     except Exception as page_error:
-                        # 개별 페이지 오류는 스킵하고 계속 진행
                         logging.warning(f"페이지 {page_num + 1} 처리 중 오류: {str(page_error)}")
                         continue
-                    finally:
-                        # 명시적 메모리 해제
-                        gc.collect()
                         
         except MemoryError:
             raise MemoryError("PDF 로드 중 메모리 부족. 파일이 너무 크거나 복잡할 수 있습니다.")
         except Exception as e:
-            # PDFPlumberLoader로 폴백 시도
-            try:
-                loader = PDFPlumberLoader(self.pdf_path)
-                documents = loader.load()
-            except Exception as fallback_error:
-                raise MemoryError(f"PDF 로드 실패: {str(e)}. 폴백 시도도 실패: {str(fallback_error)}")
+            raise ValueError(f"PDF 파일 읽기 실패: {str(e)}")
         
         if not documents:
             raise ValueError(f"PDF 파일에서 텍스트를 추출할 수 없습니다: {self.pdf_path}")
         
-        # 페이지 메타데이터 정리 (PDFPlumber는 'page' 키 사용)
-        for doc in documents:
-            if 'page' in doc.metadata:
-                doc.metadata['page_label'] = doc.metadata['page'] + 1  # 0-based를 1-based로 변환
-            # 텍스트가 너무 짧으면 스킵 (빈 페이지나 이미지만 있는 페이지)
-            if len(doc.page_content.strip()) < 50:
-                continue
+        logging.info(f"총 {len(documents)}개 페이지에서 텍스트 추출 완료")
 
         # 2. 텍스트 분할 (Chunking)
-        # 문맥이 끊기지 않도록 더 큰 청크로 설정 (한글은 더 많은 토큰 필요)
+        # 적절한 청크 크기로 품질 유지
         text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=1500,
+            chunk_size=1500,  # 원래대로 복원 (2GB면 충분)
             chunk_overlap=300,
             length_function=len
         )
+        
+        logging.info("텍스트 분할 시작")
         texts = text_splitter.split_documents(documents)
         
         # 원본 documents 메모리 해제
@@ -85,11 +87,14 @@ class ESG_RAG:
                 text.metadata['page_label'] = text.metadata['page'] + 1
 
         # 3. 임베딩 및 벡터 저장소 생성
+        logging.info(f"임베딩 생성 시작 ({len(texts)}개 청크)")
         embeddings = OpenAIEmbeddings(
             model="text-embedding-3-small",
             openai_api_key=self.api_key
         )
         self.vector_store = FAISS.from_documents(texts, embeddings)
+        
+        logging.info("벡터 DB 생성 완료")
         
         # texts 메모리 해제
         del texts
@@ -124,12 +129,12 @@ class ESG_RAG:
         PROMPT = PromptTemplate(
             template=prompt_template, input_variables=["context", "question"]
         )
-        # RAG 체인 생성 (더 많은 청크 검색으로 포괄적 분석)
+        # RAG 체인 생성
         qa_chain = RetrievalQA.from_chain_type(
             llm=ChatOpenAI(model="gpt-4o", temperature=0, openai_api_key=self.api_key),
             chain_type="stuff",
             retriever=self.vector_store.as_retriever(
-                search_kwargs={"k": 8}  # 관련성 높은 문단 8개 참조 (더 포괄적)
+                search_kwargs={"k": 8}  # 원래대로 복원 (더 포괄적 검색)
             ),
             return_source_documents=True,
             chain_type_kwargs={"prompt": PROMPT}

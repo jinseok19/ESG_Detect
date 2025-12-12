@@ -39,13 +39,15 @@ def index():
             filepath = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
             file.save(filepath)
             
-            # 파일 크기 체크 (100MB 제한)
+            # 파일 크기 체크 (100MB 제한 - 2GB 인스턴스)
             file_size = os.path.getsize(filepath) / (1024 * 1024)  # MB
             if file_size > 100:
                 flash(f'PDF 파일이 너무 큽니다 ({file_size:.1f}MB). 100MB 이하의 파일만 처리 가능합니다.', 'error')
                 if os.path.exists(filepath):
                     os.remove(filepath)
                 return redirect(request.url)
+            
+            app.logger.info(f"PDF 파일 처리 시작: {file.filename} ({file_size:.1f}MB)")
             
             # RAG 엔진 초기화 (시간이 조금 걸릴 수 있음)
             try:
