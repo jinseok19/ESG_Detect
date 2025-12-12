@@ -172,7 +172,8 @@ def serve_pdf(filename):
 def pdf_viewer(filename):
     """PDF 뷰어 페이지 (페이지 번호 파라미터 지원)"""
     page = request.args.get('page', '1')
-    return render_template('pdf_viewer.html', filename=filename, page=page)
+    highlight = request.args.get('q', '')
+    return render_template('pdf_viewer.html', filename=filename, page=page, highlight=highlight)
 
 if __name__ == '__main__':
     app.run(debug=True)

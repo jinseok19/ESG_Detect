@@ -4,43 +4,207 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PDF 뷰어 - {{ filename }}</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf_viewer.min.css">
     <style>
         body {
             margin: 0;
             padding: 0;
             overflow: hidden;
+            background: #f5f5f5;
+            font-family: "Noto Sans KR", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         }
-        iframe {
+        #viewerContainer {
+            position: relative;
             width: 100vw;
             height: 100vh;
+            overflow: auto;
+            background: #2b2b2b;
+        }
+        #canvasContainer {
+            position: relative;
+            margin: 12px auto;
+            background: #fff;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+        }
+        #pdfCanvas {
+            display: block;
+            width: 100%;
+            height: auto;
+        }
+        #textLayer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            color: transparent;
+            mix-blend-mode: multiply;
+        }
+        mark.hl {
+            background: rgba(255, 235, 59, 0.65);
+            color: #000;
+            padding: 1px 2px;
+            border-radius: 2px;
+        }
+        #toolbar {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            z-index: 10;
+            background: rgba(0,0,0,0.75);
+            color: #fff;
+            padding: 8px 12px;
+            border-radius: 8px;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            font-size: 14px;
+            backdrop-filter: blur(6px);
+        }
+        #toolbar button {
             border: none;
+            background: #3f51b5;
+            color: #fff;
+            padding: 6px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        #toolbar input {
+            width: 60px;
+            border-radius: 4px;
+            border: 1px solid #666;
+            padding: 4px 6px;
+            background: #1f1f1f;
+            color: #fff;
         }
     </style>
 </head>
 <body>
-    <iframe src="/pdf/{{ filename }}#page={{ page }}" type="application/pdf"></iframe>
+    <div id="toolbar">
+        <span id="pageInfo">- / -</span>
+        <button id="prevBtn">이전</button>
+        <button id="nextBtn">다음</button>
+        <label>이동: <input type="number" id="pageInput" min="1" value="{{ page }}"></label>
+        <button id="goBtn">GO</button>
+    </div>
+    <div id="viewerContainer">
+        <div id="canvasContainer">
+            <canvas id="pdfCanvas"></canvas>
+            <div id="textLayer" class="textLayer"></div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>
-        // 페이지 로드 후 특정 페이지로 이동 시도
-        window.onload = function() {
-            const iframe = document.querySelector('iframe');
-            const pageNum = {{ page }};
-            
-            // iframe 로드 후 페이지 이동
-            iframe.onload = function() {
-                try {
-                    // Chrome PDF 뷰어
-                    if (iframe.contentWindow && iframe.contentWindow.PDFViewerApplication) {
-                        iframe.contentWindow.PDFViewerApplication.page = pageNum;
-                    }
-                    // Firefox PDF.js
-                    else if (iframe.contentWindow && iframe.contentWindow.PDFViewer) {
-                        iframe.contentWindow.PDFViewer.page = pageNum;
-                    }
-                } catch (e) {
-                    console.log('PDF 뷰어 접근 제한:', e);
-                }
+        const fileName = "{{ filename }}";
+        const initialPage = parseInt("{{ page }}", 10) || 1;
+        // tojson으로 직렬화해 공백/한글 깨짐 방지
+        const highlightQuery = {{ highlight | tojson }} || "";
+
+        const pdfUrl = `/pdf/${fileName}`;
+        const canvas = document.getElementById('pdfCanvas');
+        const ctx = canvas.getContext('2d');
+        const textLayer = document.getElementById('textLayer');
+        const canvasContainer = document.getElementById('canvasContainer');
+        const pageInfo = document.getElementById('pageInfo');
+        const prevBtn = document.getElementById('prevBtn');
+        const nextBtn = document.getElementById('nextBtn');
+        const pageInput = document.getElementById('pageInput');
+        const goBtn = document.getElementById('goBtn');
+
+        pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+        let pdfDoc = null;
+        let currentPage = initialPage;
+        let totalPages = 0;
+        let scale = 1.2;
+
+        function fitToWidth(viewportWidth) {
+            const maxWidth = window.innerWidth - 40;
+            return maxWidth / viewportWidth;
+        }
+
+        async function renderPage(num, query = "") {
+            const page = await pdfDoc.getPage(num);
+            const viewport = page.getViewport({ scale: 1.0 });
+            scale = fitToWidth(viewport.width);
+            const scaledViewport = page.getViewport({ scale });
+
+            canvas.height = scaledViewport.height;
+            canvas.width = scaledViewport.width;
+            canvasContainer.style.width = `${scaledViewport.width}px`;
+            canvasContainer.style.height = `${scaledViewport.height}px`;
+
+            // Render page
+            const renderContext = {
+                canvasContext: ctx,
+                viewport: scaledViewport
             };
-        };
+            await page.render(renderContext).promise;
+
+            // Render text layer for searchable/highlightable text
+            const textContent = await page.getTextContent();
+            textLayer.innerHTML = '';
+            textLayer.style.height = `${scaledViewport.height}px`;
+            textLayer.style.width = `${scaledViewport.width}px`;
+
+            await pdfjsLib.renderTextLayer({
+                textContentSource: textContent,
+                container: textLayer,
+                viewport: scaledViewport,
+                textDivs: [],
+            }).promise;
+
+            applyHighlight(query);
+
+            pageInfo.textContent = `${num} / ${totalPages}`;
+            pageInput.value = num;
+        }
+
+        function applyHighlight(query) {
+            if (!query || query.length < 1) return;
+            const safe = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+            const reg = new RegExp(safe, 'gi');
+
+            textLayer.querySelectorAll('span').forEach(span => {
+                const txt = span.textContent;
+                if (reg.test(txt)) {
+                    span.innerHTML = txt.replace(reg, m => `<mark class="hl">${m}</mark>`);
+                }
+            });
+        }
+
+        function queueRender(num) {
+            if (num < 1 || num > totalPages) return;
+            currentPage = num;
+            renderPage(num, highlightQuery);
+        }
+
+        async function init() {
+            pdfDoc = await pdfjsLib.getDocument(pdfUrl).promise;
+            totalPages = pdfDoc.numPages;
+            queueRender(currentPage);
+        }
+
+        prevBtn.addEventListener('click', () => queueRender(currentPage - 1));
+        nextBtn.addEventListener('click', () => queueRender(currentPage + 1));
+        goBtn.addEventListener('click', () => {
+            const val = parseInt(pageInput.value, 10);
+            if (!isNaN(val)) queueRender(val);
+        });
+        pageInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                const val = parseInt(pageInput.value, 10);
+                if (!isNaN(val)) queueRender(val);
+            }
+        });
+
+        window.addEventListener('resize', () => queueRender(currentPage));
+
+        init().catch(err => {
+            console.error(err);
+            alert("PDF를 불러오는데 실패했습니다.");
+        });
     </script>
 </body>
 </html>

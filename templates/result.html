@@ -44,6 +44,15 @@
             opacity: 0.9;
             transform: scale(1.05);
         }
+        /* 페이지 이동 시 PDF 뷰어 하이라이트 */
+        .pulse-highlight {
+            animation: pulse 1s ease-in-out 2;
+        }
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(102, 126, 234, 0.6); }
+            70% { box-shadow: 0 0 0 12px rgba(102, 126, 234, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(102, 126, 234, 0); }
+        }
     </style>
 </head>
 <body class="bg-light">
@@ -126,7 +135,7 @@
             </div>
             <div class="card-body p-0" id="pdfViewerContainer" style="height: 800px;">
                 <iframe id="pdfViewer" 
-                        src="/pdf/{{ pdf_filename }}" 
+                        src="/viewer/{{ pdf_filename }}?page=1" 
                         style="width: 100%; height: 100%; border: none;"
                         type="application/pdf">
                     브라우저가 PDF를 지원하지 않습니다. 
@@ -189,9 +198,10 @@
                                             {% endif %}
                                             
                                             {% if page_num %}
-                                                <a href="/pdf/{{ pdf_filename }}#page={{ page_num }}" 
+                                                <a href="/viewer/{{ pdf_filename }}?page={{ page_num }}&q={{ result.title | urlencode }}" 
                                                    class="badge bg-primary category-badge text-decoration-none me-1" 
-                                                   onclick="gotoPage({{ page_num }}, event); return false;"
+                                                   data-highlight="{{ result.title }}"
+                                                   onclick="gotoPage({{ page_num }}, event, '{{ result.title | e }}'); return false;"
                                                    title="클릭하여 PDF {{ page_num }}페이지로 이동 (우클릭: 새 창에서 열기)"
                                                    target="_blank">
                                                     <i class="bi bi-arrow-right-circle"></i> {{ source }}
@@ -228,11 +238,12 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         // PDF 특정 페이지로 이동하는 함수
-        function gotoPage(pageNum, evt) {
+        function gotoPage(pageNum, evt, highlightText) {
             if (!evt) evt = window.event;
             
             const pdfViewer = document.getElementById('pdfViewer');
             const container = document.getElementById('pdfViewerContainer');
+            const badge = evt && evt.target ? evt.target.closest('.badge') : null;
             
             // PDF 뷰어가 숨겨져 있으면 표시
             if (container.style.display === 'none') {
@@ -242,8 +253,9 @@
             }
             
             // 페이지 이동 - iframe src 변경
-            const baseUrl = '/pdf/{{ pdf_filename }}';
-            const pdfUrl = baseUrl + '#page=' + pageNum;
+            const baseUrl = '/viewer/{{ pdf_filename }}';
+            const query = highlightText ? ('&q=' + encodeURIComponent(highlightText)) : '';
+            const pdfUrl = `${baseUrl}?page=${pageNum}${query}`;
             
             // iframe을 완전히 재로드 (캐시 방지를 위해 타임스탬프 추가)
             const currentSrc = pdfViewer.src.split('#')[0];
@@ -274,16 +286,19 @@
             }, 300);
             
             // 뱃지 하이라이트 효과
-            if (evt && evt.target) {
-                const badge = evt.target.closest('.badge');
-                if (badge) {
-                    badge.style.transform = 'scale(1.1)';
-                    badge.style.transition = 'transform 0.2s';
-                    setTimeout(() => {
-                        badge.style.transform = 'scale(1)';
-                    }, 300);
-                }
+            if (badge) {
+                badge.classList.add('bg-warning', 'text-dark');
+                badge.style.transform = 'scale(1.08)';
+                badge.style.transition = 'transform 0.2s';
+                setTimeout(() => {
+                    badge.classList.remove('bg-warning', 'text-dark');
+                    badge.style.transform = 'scale(1)';
+                }, 800);
             }
+
+            // PDF 뷰어 컨테이너 하이라이트 효과
+            container.classList.add('pulse-highlight');
+            setTimeout(() => container.classList.remove('pulse-highlight'), 1200);
             
             return false;
         }
