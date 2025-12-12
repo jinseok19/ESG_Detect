@@ -1,9 +1,10 @@
 import os
 import traceback
 
-from flask import Flask, render_template, request, redirect, flash, send_from_directory
+from flask import Flask, render_template, request, redirect, flash, send_from_directory, jsonify
 from dotenv import load_dotenv
 from rag_engine import ESG_RAG
+from agent_engine import analyze_esg_report
 
 # 환경변수 로드
 load_dotenv()
@@ -164,6 +165,54 @@ def pdf_viewer(filename):
     page = request.args.get('page', '1')
     highlight = request.args.get('q', '')
     return render_template('pdf_viewer.html', filename=filename, page=page, highlight=highlight)
+
+@app.route('/analyze', methods=['POST'])
+def analyze():
+    """ESG-Radar 고도화 분석 (LangGraph Multi-Agent)"""
+    try:
+        if 'file' not in request.files:
+            return jsonify({'error': '파일이 선택되지 않았습니다.'}), 400
+        
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'error': '파일이 선택되지 않았습니다.'}), 400
+        
+        if not file.filename.lower().endswith('.pdf'):
+            return jsonify({'error': 'PDF 파일만 업로드 가능합니다.'}), 400
+        
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            return jsonify({'error': 'OPENAI_API_KEY 환경변수가 설정되지 않았습니다.'}), 500
+        
+        # 파일 저장
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
+        file.save(filepath)
+        
+        # 파일 크기 체크
+        file_size = os.path.getsize(filepath) / (1024 * 1024)
+        if file_size > 100:
+            os.remove(filepath)
+            return jsonify({'error': f'파일이 너무 큽니다 ({file_size:.1f}MB). 100MB 이하만 가능합니다.'}), 400
+        
+        app.logger.info(f"ESG-Radar 분석 시작: {file.filename} ({file_size:.1f}MB)")
+        
+        # LangGraph Multi-Agent 분석 실행
+        try:
+            report = analyze_esg_report(filepath, api_key)
+            
+            # 대시보드로 리다이렉트
+            return render_template('dashboard.html', 
+                                 report=report, 
+                                 filename=file.filename)
+        
+        except Exception as e:
+            app.logger.error(f"분석 중 오류: {str(e)}")
+            os.remove(filepath)
+            return jsonify({'error': f'분석 중 오류가 발생했습니다: {str(e)}'}), 500
+    
+    except Exception as e:
+        app.logger.error(f'처리 중 오류: {str(e)}\n{traceback.format_exc()}')
+        return jsonify({'error': f'처리 중 오류가 발생했습니다: {str(e)}'}), 500
 
 if __name__ == '__main__':
     app.run(debug=True)

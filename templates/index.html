@@ -29,25 +29,80 @@
                     {% endif %}
                 {% endwith %}
                 <div class="card shadow">
-                    <div class="card-header bg-primary text-white">
-                        <h2 class="mb-0">🔍 ESG 보고서 RAG 검토 시스템</h2>
+                    <div class="card-header bg-gradient text-white" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                        <h2 class="mb-0">🚀 ESG-Radar</h2>
+                        <p class="mb-0 small">AI-Powered ESG Pre-Assurance Platform</p>
                     </div>
                     <div class="card-body">
-                        <p class="lead">PDF 형식의 ESG 보고서를 업로드하여 자동으로 검토하세요.</p>
+                        <p class="lead">PDF 형식의 ESG 보고서를 업로드하여 AI 기반 종합 분석을 받으세요.</p>
+                        
+                        <!-- 분석 모드 선택 -->
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">분석 모드 선택</label>
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <div class="card h-100 border-primary" id="basicMode" onclick="selectMode('basic')" style="cursor: pointer;">
+                                        <div class="card-body text-center">
+                                            <h5>📋 기본 검토</h5>
+                                            <p class="small text-muted">주요 ESG 항목 간단 확인<br>(30초~1분)</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="card h-100 border-success" id="advancedMode" onclick="selectMode('advanced')" style="cursor: pointer; box-shadow: 0 0 10px rgba(102, 126, 234, 0.3);">
+                                        <div class="card-body text-center">
+                                            <h5>🏆 Pre-Assurance 분석</h5>
+                                            <p class="small text-muted">정합성 검증 + 그린워싱 감사<br>(2~3분)</p>
+                                            <span class="badge bg-success">추천</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
                         <form method="POST" enctype="multipart/form-data" id="uploadForm" onsubmit="showLoading()">
+                            <input type="hidden" id="analysisMode" name="mode" value="advanced">
                             <div class="mb-3">
                                 <label for="file" class="form-label">PDF 파일 선택</label>
                                 <input type="file" class="form-control" id="file" name="file" accept=".pdf" required>
                             </div>
-                            <button type="submit" class="btn btn-primary btn-lg w-100" id="submitBtn">
-                                <span id="submitText">분석 시작</span>
+                            <button type="submit" class="btn btn-lg w-100" id="submitBtn" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none;">
+                                <span id="submitText">🚀 분석 시작</span>
                                 <span id="loadingSpinner" class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
                             </button>
                         </form>
+                        
+                        <script>
+                            function selectMode(mode) {
+                                const basicCard = document.getElementById('basicMode');
+                                const advancedCard = document.getElementById('advancedMode');
+                                const modeInput = document.getElementById('analysisMode');
+                                const form = document.getElementById('uploadForm');
+                                
+                                if (mode === 'basic') {
+                                    basicCard.style.boxShadow = '0 0 10px rgba(102, 126, 234, 0.3)';
+                                    advancedCard.style.boxShadow = 'none';
+                                    modeInput.value = 'basic';
+                                    form.action = '/';
+                                } else {
+                                    advancedCard.style.boxShadow = '0 0 10px rgba(102, 126, 234, 0.3)';
+                                    basicCard.style.boxShadow = 'none';
+                                    modeInput.value = 'advanced';
+                                    form.action = '/analyze';
+                                }
+                            }
+                            
+                            // 기본값: advanced 모드
+                            selectMode('advanced');
+                        </script>
                         <div class="mt-4">
                             <h5>검토 항목:</h5>
                             <ul class="list-group">
-                                <li class="list-group-item">✅ Scope 3 배출량 데이터 확인</li>
+                                <li class="list-group-item">🔍 K-ESG 5대 필수 항목 (온실가스, 에너지, 용수, 폐기물, 법규위반)</li>
+                                <li class="list-group-item">📊 데이터 정합성 및 Decoupling 분석</li>
+                                <li class="list-group-item">🌱 그린워싱 위험 탐지 (환경부 고시 + EU 기준)</li>
+                                <li class="list-group-item">🏆 Pre-Assurance 인증 자격 판정</li>
+                                <li class="list-group-item">✅ Scope 1, 2, 3 배출량 데이터 확인</li>
                                 <li class="list-group-item">✅ 온실가스 배출량 측정 방법론 확인</li>
                                 <li class="list-group-item">✅ 이중 중대성(Double Materiality) 평가 확인</li>
                             </ul>

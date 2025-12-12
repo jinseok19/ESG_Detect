@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESG-Radar Dashboard | Pre-Assurance 분석 결과</title>
+    
+    <!-- Bootstrap 5 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        :root {
+            --primary-color: #2C3E50;
+            --success-color: #27AE60;
+            --warning-color: #F39C12;
+            --danger-color: #E74C3C;
+            --bg-light: #ECF0F1;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 40px 0;
+        }
+        
+        .dashboard-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+        
+        .dashboard-header {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+        
+        .logo-section {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        
+        .logo-icon {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 28px;
+        }
+        
+        .card-modern {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 25px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+            border: none;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        
+        .card-modern:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.12);
+        }
+        
+        .score-card {
+            text-align: center;
+            padding: 30px;
+        }
+        
+        .score-value {
+            font-size: 56px;
+            font-weight: 700;
+            margin: 15px 0;
+        }
+        
+        .score-label {
+            font-size: 14px;
+            color: #7f8c8d;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: 600;
+        }
+        
+        .badge-assurance {
+            background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+            color: #2C3E50;
+            padding: 30px;
+            border-radius: 15px;
+            text-align: center;
+            box-shadow: 0 8px 20px rgba(255, 215, 0, 0.3);
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% {
+                transform: scale(1);
+                box-shadow: 0 8px 20px rgba(255, 215, 0, 0.3);
+            }
+            50% {
+                transform: scale(1.02);
+                box-shadow: 0 12px 30px rgba(255, 215, 0, 0.4);
+            }
+        }
+        
+        .badge-assurance i {
+            font-size: 48px;
+            margin-bottom: 15px;
+            display: block;
+        }
+        
+        .badge-assurance h3 {
+            font-weight: 700;
+            margin: 10px 0;
+        }
+        
+        .risk-badge {
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 14px;
+            display: inline-block;
+        }
+        
+        .risk-low {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .risk-medium {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .risk-high {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 300px;
+            margin: 20px 0;
+        }
+        
+        .table-modern {
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        
+        .table-modern thead {
+            background: var(--primary-color);
+            color: white;
+        }
+        
+        .table-modern tbody tr:hover {
+            background: #f8f9fa;
+        }
+        
+        .checklist-item {
+            display: flex;
+            align-items: center;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+        
+        .checklist-item i {
+            font-size: 20px;
+            margin-right: 15px;
+        }
+        
+        .btn-download {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-download:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-container">
+        <!-- Header -->
+        <div class="dashboard-header">
+            <div class="logo-section">
+                <div class="logo-icon">
+                    <i class="fas fa-radar"></i>
+                </div>
+                <div>
+                    <h1 class="mb-0">ESG-Radar</h1>
+                    <p class="text-muted mb-0">AI-Powered ESG Pre-Assurance Platform</p>
+                </div>
+            </div>
+            <hr>
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h5 class="mb-1">분석 대상 보고서</h5>
+                    <p class="text-muted mb-0"><i class="fas fa-file-pdf text-danger"></i> {{ filename }}</p>
+                </div>
+                <button class="btn btn-download" onclick="window.print()">
+                    <i class="fas fa-download"></i> PDF 다운로드
+                </button>
+            </div>
+        </div>
+
+        <!-- Pre-Assurance 인증서 (조건부 표시) -->
+        {% if report.pre_assurance_eligible %}
+        <div class="badge-assurance">
+            <i class="fas fa-certificate"></i>
+            <h3>🏆 ESG-Radar Pre-Assurance 인증 획득</h3>
+            <p class="mb-0">본 보고서는 데이터 정합성 및 그린워싱 감사를 통과하였습니다.</p>
+            <small class="d-block mt-2">Integrity Score: {{ report.integrity_score }}점 | Greenwashing Score: {{ report.greenwashing_score }}점</small>
+        </div>
+        {% endif %}
+
+        <!-- 점수 카드 -->
+        <div class="row g-4 mb-4">
+            <div class="col-md-4">
+                <div class="card-modern score-card">
+                    <div class="score-label">종합 점수</div>
+                    <div class="score-value" style="color: {% if report.composite_score >= 80 %}var(--success-color){% elif report.composite_score >= 60 %}var(--warning-color){% else %}var(--danger-color){% endif %}">
+                        {{ report.composite_score }}
+                    </div>
+                    <div>/ 100점</div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card-modern score-card">
+                    <div class="score-label">데이터 정합성</div>
+                    <div class="score-value" style="color: {% if report.integrity_score >= 80 %}var(--success-color){% elif report.integrity_score >= 60 %}var(--warning-color){% else %}var(--danger-color){% endif %}">
+                        {{ report.integrity_score }}
+                    </div>
+                    <div>Integrity Score</div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card-modern score-card">
+                    <div class="score-label">그린워싱 위험도</div>
+                    <div class="score-value" style="color: {% if report.greenwashing_score >= 80 %}var(--success-color){% elif report.greenwashing_score >= 60 %}var(--warning-color){% else %}var(--danger-color){% endif %}">
+                        {{ report.greenwashing_score }}
+                    </div>
+                    <div>
+                        <span class="risk-badge risk-{{ report.risk_level|lower }}">
+                            {{ report.risk_level }} Risk
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 차트 섹션 -->
+        <div class="row g-4 mb-4">
+            <div class="col-md-6">
+                <div class="card-modern">
+                    <h5 class="mb-3"><i class="fas fa-chart-radar text-primary"></i> 종합 분석</h5>
+                    <div class="chart-container">
+                        <canvas id="radarChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card-modern">
+                    <h5 class="mb-3"><i class="fas fa-chart-pie text-success"></i> K-ESG 5대 항목 준수율</h5>
+                    <div class="chart-container">
+                        <canvas id="doughnutChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- K-ESG 5대 항목 체크리스트 -->
+        <div class="card-modern mb-4">
+            <h5 class="mb-3"><i class="fas fa-tasks text-info"></i> K-ESG 필수 5대 항목 체크리스트</h5>
+            <p class="text-muted">완료율: {{ report.k_esg_completion }}%</p>
+            
+            {% for key, item in report.k_esg_checklist.items() %}
+            <div class="checklist-item">
+                <i class="fas {% if item.found %}fa-check-circle text-success{% else %}fa-times-circle text-danger{% endif %}"></i>
+                <div class="flex-grow-1">
+                    <strong>{{ item.title }}</strong>
+                    <p class="mb-0 text-muted small">{{ item.answer[:150] }}{% if item.answer|length > 150 %}...{% endif %}</p>
+                    {% if item.pages %}
+                    <small class="text-primary"><i class="fas fa-map-marker-alt"></i> 페이지: {{ item.pages|join(', ') }}</small>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Decoupling 분석 -->
+        <div class="card-modern mb-4">
+            <h5 class="mb-3"><i class="fas fa-chart-line text-warning"></i> Decoupling 분석</h5>
+            <p class="text-muted">매출/생산량 대비 배출량 추이 탈동조화</p>
+            
+            {% if report.decoupling_analysis.explained %}
+            <div class="alert alert-success">
+                <i class="fas fa-check-circle"></i> <strong>Decoupling 설명 확인됨</strong>
+                <p class="mb-0 mt-2">{{ report.decoupling_analysis.answer }}</p>
+            </div>
+            {% else %}
+            <div class="alert alert-warning">
+                <i class="fas fa-exclamation-triangle"></i> <strong>Decoupling 분석 누락</strong>
+                <p class="mb-0 mt-2">매출/생산량 증가에도 불구하고 배출량이 감소하는 추이(Decoupling)에 대한 설명이 부족합니다.</p>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- 그린워싱 위험 사항 -->
+        <div class="card-modern mb-4">
+            <h5 class="mb-3"><i class="fas fa-exclamation-triangle text-danger"></i> 그린워싱 위험 감지 결과</h5>
+            
+            {% if report.greenwashing_risks|length == 0 %}
+            <div class="alert alert-success">
+                <i class="fas fa-shield-alt"></i> <strong>위험 요소 없음</strong>
+                <p class="mb-0">환경부 고시 및 EU Green Claims Directive 기준으로 그린워싱 위험 요소가 발견되지 않았습니다.</p>
+            </div>
+            {% else %}
+            <p class="text-muted">총 {{ report.total_risks_found }}건의 위험 요소가 발견되었습니다.</p>
+            
+            <div class="table-responsive">
+                <table class="table table-modern">
+                    <thead>
+                        <tr>
+                            <th style="width: 15%;">위험 유형</th>
+                            <th style="width: 10%;">심각도</th>
+                            <th style="width: 45%;">위험 내용</th>
+                            <th style="width: 20%;">근거 법령</th>
+                            <th style="width: 10%;">페이지</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for risk in report.greenwashing_risks %}
+                        <tr>
+                            <td><strong>{{ risk.category }}</strong></td>
+                            <td>
+                                <span class="risk-badge risk-{{ risk.severity|lower }}">
+                                    {{ risk.severity }}
+                                </span>
+                            </td>
+                            <td>{{ risk.description[:200] }}{% if risk.description|length > 200 %}...{% endif %}</td>
+                            <td><small>{{ risk.regulation }}</small></td>
+                            <td>
+                                {% if risk.pages %}
+                                <span class="badge bg-primary">{{ risk.pages|join(', ') }}</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Footer -->
+        <div class="card-modern text-center">
+            <p class="text-muted mb-2">
+                <i class="fas fa-info-circle"></i> 본 분석은 AI 기반 Pre-Assurance 시스템으로 참고용으로만 사용하시기 바랍니다.
+            </p>
+            <small class="text-muted">
+                ESG-Radar v1.0 | Powered by OpenAI GPT-4o & LangGraph
+            </small>
+        </div>
+    </div>
+
+    <!-- Chart.js 스크립트 -->
+    <script>
+        // Radar Chart (종합 분석)
+        const radarCtx = document.getElementById('radarChart').getContext('2d');
+        new Chart(radarCtx, {
+            type: 'radar',
+            data: {
+                labels: ['데이터 정합성', '그린워싱 위험도', 'K-ESG 준수', 'Decoupling 분석', '투명성'],
+                datasets: [{
+                    label: '현재 점수',
+                    data: [
+                        {{ report.integrity_score }},
+                        {{ report.greenwashing_score }},
+                        {{ report.k_esg_completion }},
+                        {% if report.decoupling_analysis.explained %}100{% else %}0{% endif %},
+                        {{ (report.integrity_score + report.greenwashing_score) / 2 }}
+                    ],
+                    backgroundColor: 'rgba(102, 126, 234, 0.2)',
+                    borderColor: 'rgba(102, 126, 234, 1)',
+                    borderWidth: 2,
+                    pointBackgroundColor: 'rgba(102, 126, 234, 1)',
+                    pointBorderColor: '#fff',
+                    pointHoverBackgroundColor: '#fff',
+                    pointHoverBorderColor: 'rgba(102, 126, 234, 1)'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    r: {
+                        beginAtZero: true,
+                        max: 100,
+                        ticks: {
+                            stepSize: 20
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                }
+            }
+        });
+
+        // Doughnut Chart (K-ESG 준수율)
+        const doughnutCtx = document.getElementById('doughnutChart').getContext('2d');
+        
+        {% set found_count = report.k_esg_checklist.values()|selectattr('found')|list|length %}
+        {% set total_count = report.k_esg_checklist|length %}
+        {% set missing_count = total_count - found_count %}
+        
+        new Chart(doughnutCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['준수', '미준수'],
+                datasets: [{
+                    data: [{{ found_count }}, {{ missing_count }}],
+                    backgroundColor: [
+                        'rgba(39, 174, 96, 0.8)',
+                        'rgba(231, 76, 60, 0.8)'
+                    ],
+                    borderColor: [
+                        'rgba(39, 174, 96, 1)',
+                        'rgba(231, 76, 60, 1)'
+                    ],
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.label || '';
+                                let value = context.parsed || 0;
+                                let total = {{ total_count }};
+                                let percentage = Math.round((value / total) * 100);
+                                return label + ': ' + value + '개 (' + percentage + '%)';
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    </script>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
+
